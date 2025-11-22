@@ -4,7 +4,6 @@ import { useTypedSelector } from '../../hooks/useTypedSelector';
 import { useDispatch } from 'react-redux';
 import { addReceipt, updateReceipt, setReceipts } from '../../store/slices/operationSlice';
 import operationService from '../../services/operationService';
-import operationService from '../../services/operationService';
 import warehouseService from '../../services/warehouseService';
 
 export const Receipts: React.FC = () => {
