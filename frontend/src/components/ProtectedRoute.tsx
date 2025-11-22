@@ -33,34 +33,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const isWarehouseStaff = user?.role === 'warehouse_staff';
   const isManager = user?.role === 'inventory_manager';
   
-  // Warehouse staff restricted routes
+  // Manager only routes (staff cannot access)
   const managerOnlyRoutes = [
-    '/dashboard',
-    '/products', 
-    '/operations/receipts',
-    '/operations/deliveries', 
-    '/operations/adjustments',
-    '/move-history',
-    '/settings',
-    '/staff-management'
-  ];
-  
-  // Staff only routes
-  const staffOnlyRoutes = [
-    '/warehouse-dashboard',
-    '/my-tasks',
-    '/quick-receive',
-    '/quick-pick',
-    '/stock-count',
-    '/my-history'
+    '/app/settings',
+    '/app/staff-management'
   ];
 
   if (isWarehouseStaff && managerOnlyRoutes.includes(location.pathname)) {
-    return <Navigate to="/warehouse-dashboard" replace />;
-  }
-
-  if (isManager && staffOnlyRoutes.includes(location.pathname)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/app/dashboard" replace />;
   }
 
   return <>{children}</>;

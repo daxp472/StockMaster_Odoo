@@ -2,7 +2,9 @@ import api from './api';
 
 // Get dashboard statistics
 export const getDashboardStats = async () => {
+  console.log('dashboardService: Fetching /dashboard/stats...');
   const response = await api.get('/dashboard/stats');
+  console.log('dashboardService: Response received:', response.data);
   return response.data;
 };
 

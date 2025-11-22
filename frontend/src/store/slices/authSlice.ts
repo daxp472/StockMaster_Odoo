@@ -58,7 +58,12 @@ export const fetchWarehouseStaff = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await authService.getWarehouseStaff();
-      return response.data;
+      // Map _id to id for consistent usage
+      const staffData = response.data.map((staff: any) => ({
+        ...staff,
+        id: staff._id || staff.id
+      }));
+      return staffData;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch staff');
     }
@@ -70,7 +75,11 @@ export const registerStaff = createAsyncThunk(
   async (userData: any, { rejectWithValue }) => {
     try {
       const response = await authService.register(userData);
-      return response.data;
+      const staffData = {
+        ...response.data,
+        id: response.data._id || response.data.id
+      };
+      return staffData;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Registration failed');
     }
@@ -85,7 +94,11 @@ export const updateStaffStatus = createAsyncThunk(
   ) => {
     try {
       const response = await authService.updateStaffStatus(staffId, isActive);
-      return response.data;
+      const staffData = {
+        ...response.data,
+        id: response.data._id || response.data.id
+      };
+      return staffData;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to update staff status');
     }

@@ -34,8 +34,19 @@ export const fetchDashboardStats = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await dashboardService.getDashboardStats();
-      return response.data;
+      console.log('fetchDashboardStats: Full response:', response);
+      // Backend returns { success: true, data: { stats: {...}, recentMovements: [...], lowStockProducts: [...] } }
+      // Axios response.data is the body, so we get { success: true, data: {...} }
+      // We need to access response.data.stats
+      if (response.data && response.data.stats) {
+        console.log('fetchDashboardStats: Extracted stats:', response.data.stats);
+        return response.data.stats;
+      } else {
+        console.error('fetchDashboardStats: Unexpected response structure:', response);
+        return rejectWithValue('Unexpected response structure');
+      }
     } catch (error: any) {
+      console.error('fetchDashboardStats: Error:', error);
       return rejectWithValue(error.message || 'Failed to fetch dashboard stats');
     }
   }
@@ -46,7 +57,8 @@ export const fetchStaffDashboardStats = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await dashboardService.getStaffDashboardStats();
-      return response.data;
+      // Backend returns { data: { stats: {...}, myRecentActivities: [...] } }
+      return response.data.stats;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch staff dashboard stats');
     }
@@ -72,12 +84,15 @@ const dashboardSlice = createSlice({
     builder.addCase(fetchDashboardStats.pending, (state) => {
       state.isLoading = true;
       state.error = null;
+      console.log('dashboardSlice: Fetching stats...');
     });
     builder.addCase(fetchDashboardStats.fulfilled, (state, action) => {
+      console.log('dashboardSlice: Stats received:', action.payload);
       state.stats = action.payload;
       state.isLoading = false;
     });
     builder.addCase(fetchDashboardStats.rejected, (state, action) => {
+      console.error('dashboardSlice: Fetch failed:', action.payload);
       state.isLoading = false;
       state.error = action.payload as string;
     });

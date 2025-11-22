@@ -10,6 +10,7 @@ import { SignupPage } from './components/Auth/SignupPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Pages
+import LandingPage from './pages/LandingPage';
 import { Dashboard } from './pages/Dashboard';
 import { WarehouseDashboard } from './pages/WarehouseDashboard';
 import { StaffManagement } from './pages/StaffManagement';
@@ -33,20 +34,24 @@ function App() {
         <div className="App">
           <Routes>
 
+            {/* Landing Page */}
+            <Route path="/" element={<LandingPage />} />
+
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/register" element={<SignupPage />} />
 
             {/* Protected App Routes */}
             <Route
-              path="/*"
+              path="/app/*"
               element={
                 <ProtectedRoute>
                   <Layout />
                 </ProtectedRoute>
               }
             >
-              {/* Default redirect (✔ FIXED: using index route) */}
+              {/* Default redirect to dashboard */}
               <Route index element={<Navigate to="dashboard" replace />} />
 
               {/* App Pages */}

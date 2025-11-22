@@ -3,15 +3,19 @@ import { Plus, Eye, Check, Package } from 'lucide-react';
 import { useTypedSelector } from '../../hooks/useTypedSelector';
 import { useDispatch } from 'react-redux';
 import { addDelivery, updateDelivery, setDeliveries } from '../../store/slices/operationSlice';
+import { fetchProducts } from '../../store/slices/productSlice';
+import { AppDispatch } from '../../store';
 import operationService from '../../services/operationService';
 import warehouseService from '../../services/warehouseService';
 
 export const Deliveries: React.FC = () => {
   const { deliveries } = useTypedSelector((state) => state.operations);
   const { products } = useTypedSelector((state) => state.products);
-  const dispatch = useDispatch();
+  const { user } = useTypedSelector((state) => state.auth);
+  const dispatch = useDispatch<AppDispatch>();
   const [showModal, setShowModal] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
+  const isManager = user?.role === 'inventory_manager';
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -26,6 +30,35 @@ export const Deliveries: React.FC = () => {
 
   const handleStatusChange = async (id: string, newStatus: 'draft' | 'waiting' | 'ready' | 'done' | 'canceled') => {
     try {
+      if (newStatus === 'canceled') {
+        await operationService.cancelDelivery(id);
+        const fetchDeliveries = async () => {
+          const resp = await operationService.getDeliveries();
+          const list = (resp && resp.data) ? resp.data : resp;
+          const mapped = (list || []).map((d: any) => {
+            const totalQuantity = (d.items || []).reduce((sum: number, it: any) => sum + (it.quantityDemand || 0), 0);
+            return {
+              id: d._id || d.id,
+              reference: d.reference,
+              customer: d.customer,
+              status: d.status || 'draft',
+              date: d.scheduledDate || d.createdAt || new Date().toISOString(),
+              totalQuantity,
+              items: (d.items || []).map((it: any) => ({
+                id: it._id || it.id || `${d._id || d.id}-${it.product?._id || it.product}`,
+                productId: it.product?._id || it.product,
+                productName: it.product?.name || (products.find(p => p.id === (it.product?._id || it.product))?.name || ''),
+                productSku: it.product?.sku || (products.find(p => p.id === (it.product?._id || it.product))?.sku || ''),
+                quantityDemand: it.quantityDemand || 0,
+                quantityDone: it.quantityDone || 0,
+              })),
+            };
+          });
+          dispatch(setDeliveries(mapped));
+        };
+        fetchDeliveries();
+        return;
+      }
       const updated = await operationService.updateDelivery(id, { status: newStatus } as any);
       const mapped = {
         id: updated.data?._id || updated._id,
@@ -45,13 +78,60 @@ export const Deliveries: React.FC = () => {
         notes: updated.data?.notes || updated.notes,
       };
       dispatch(updateDelivery(mapped as any));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update delivery status', err);
+      alert('Failed to update delivery status: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  // Fetch deliveries from backend and populate list
+  const handleProcessDelivery = async (delivery: any) => {
+    try {
+      // Process the delivery with all items at their demanded quantities
+      const items = delivery.items.map((item: any) => ({
+        productId: item.productId,
+        quantityDone: item.quantityDemand
+      }));
+      
+      await operationService.processDelivery(delivery.id, items);
+      
+      // Refresh the deliveries list
+      const resp = await operationService.getDeliveries();
+      const list = (resp && resp.data) ? resp.data : resp;
+      const mapped = (list || []).map((d: any) => {
+        const totalQuantity = (d.items || []).reduce((sum: number, it: any) => sum + (it.quantityDemand || 0), 0);
+        return {
+          id: d._id || d.id,
+          reference: d.reference,
+          customer: d.customer,
+          status: d.status || 'draft',
+          date: d.scheduledDate || d.createdAt || new Date().toISOString(),
+          totalQuantity,
+          items: (d.items || []).map((it: any) => ({
+            id: it._id || it.id || `${d._id || d.id}-${it.product?._id || it.product}`,
+            productId: it.product?._id || it.product,
+            productName: it.product?.name || (products.find(p => p.id === (it.product?._id || it.product))?.name || ''),
+            productSku: it.product?.sku || (products.find(p => p.id === (it.product?._id || it.product))?.sku || ''),
+            quantityDemand: it.quantityDemand || 0,
+            quantityDone: it.quantityDone || 0,
+          })),
+        };
+      });
+      dispatch(setDeliveries(mapped));
+      
+      // Refresh products to show updated stock
+      dispatch(fetchProducts());
+      
+      alert('✅ Delivery processed successfully! Stock has been updated.');
+    } catch (err: any) {
+      console.error('Failed to process delivery', err);
+      alert('Failed to process delivery: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  // Fetch deliveries and products from backend
   useEffect(() => {
+    dispatch(fetchProducts());
+    
     const fetchDeliveries = async () => {
       try {
         const resp = await operationService.getDeliveries();
@@ -83,12 +163,7 @@ export const Deliveries: React.FC = () => {
       }
     };
     fetchDeliveries();
-  }, [dispatch, products]);
-
-  const handleValidate = (delivery: any) => {
-    const updatedDelivery = { ...delivery, status: 'done' };
-    dispatch(updateDelivery(updatedDelivery));
-  };
+  }, [dispatch]); // FIXED: Removed 'products' dependency to prevent infinite loop
 
   const CreateDeliveryModal = () => {
     const [formData, setFormData] = useState({
@@ -239,8 +314,12 @@ export const Deliveries: React.FC = () => {
                     className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="">Select Product</option>
-                    {products.map(product => (
-                      <option key={product.id} value={product.id}>{product.name} ({product.sku})</option>
+                    {products
+                      .filter(product => product.currentStock > 0)
+                      .map(product => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} ({product.sku}) - Stock: {product.currentStock}
+                      </option>
                     ))}
                   </select>
                   <input
@@ -294,13 +373,15 @@ export const Deliveries: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Delivery Orders (Outgoing Stock)</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Delivery
-        </button>
+        {isManager && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Delivery
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -371,13 +452,13 @@ export const Deliveries: React.FC = () => {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      {delivery.status === 'ready' && (
+                      {(delivery.status === 'ready' || delivery.status === 'waiting') && (
                         <button
-                          onClick={() => handleValidate(delivery)}
+                          onClick={() => handleProcessDelivery(delivery)}
                           className="text-green-600 hover:text-green-900 p-1"
-                          title="Validate Delivery"
+                          title="Process Delivery (Update Stock)"
                         >
-                          <Check className="w-4 h-4" />
+                          <Package className="w-4 h-4" />
                         </button>
                       )}
                     </div>

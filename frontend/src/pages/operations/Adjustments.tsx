@@ -10,7 +10,9 @@ import warehouseService from '../../services/warehouseService';
 export const Adjustments: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { products } = useTypedSelector((state) => state.products);
+  const { user } = useTypedSelector((state) => state.auth);
   const [warehouses, setWarehouses] = useState<any[]>([]);
+  const isManager = user?.role === 'inventory_manager';
 
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -18,11 +20,6 @@ export const Adjustments: React.FC = () => {
   const [adjustments, setAdjustments] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     items: [
-      {
-        productId: '',
-        currentStock: 0,
-        countedQuantity: 0,
-      },
       {
         productId: '',
         currentStock: 0,
@@ -36,6 +33,9 @@ export const Adjustments: React.FC = () => {
   });
 
   useEffect(() => {
+    // Fetch products when component mounts
+    dispatch(fetchProducts({}));
+    
     const fetchAdjustments = async () => {
       try {
         setLoading(true);
@@ -44,11 +44,15 @@ export const Adjustments: React.FC = () => {
         const list = (response.data || []).map((adj: any) => ({
           id: adj._id,
           reference: adj.reference,
-          productName: adj.items?.[0]?.product?.name || '—',
-          productSku: adj.items?.[0]?.product?.sku || '—',
-          quantity: adj.items?.[0]?.difference ?? 0,
+          warehouse: adj.warehouse?.name || '—',
+          location: adj.location || '—',
+          reason: adj.reason,
+          itemsCount: adj.items?.length || 0,
+          totalAdjustment: adj.totalAdjustment || 0,
+          status: adj.status,
           date: adj.adjustmentDate || adj.createdAt,
-          notes: adj.reasonDescription || adj.reason,
+          notes: adj.reasonDescription || '',
+          items: adj.items || [],
         }));
         setAdjustments(list);
       } catch (err: any) {
@@ -57,18 +61,20 @@ export const Adjustments: React.FC = () => {
         setLoading(false);
       }
     };
+    
     const fetchWarehouses = async () => {
       try {
         const resp = await warehouseService.getWarehouses();
         const data = resp?.data?.data || resp?.data || [];
         setWarehouses(data);
       } catch (e) {
-        // keep local empty; user must select warehouse manually if none fetched
+        console.error('Failed to fetch warehouses:', e);
       }
     };
+    
     fetchAdjustments();
     fetchWarehouses();
-  }, []);
+  }, [dispatch]);
 
   const handleProductSelect = (index: number, productId: string) => {
     const product = products.find(p => p.id === productId);
@@ -82,6 +88,22 @@ export const Adjustments: React.FC = () => {
         };
         return { ...prev, items };
       });
+    }
+  };
+
+  const addProductRow = () => {
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, { productId: '', currentStock: 0, countedQuantity: 0 }]
+    }));
+  };
+
+  const removeProductRow = (index: number) => {
+    if (formData.items.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.filter((_, i) => i !== index)
+      }));
     }
   };
 
@@ -101,12 +123,10 @@ export const Adjustments: React.FC = () => {
           const product = products.find(p => p.id === it.productId);
           const currentStock = product ? product.currentStock : it.currentStock || 0;
           const countedQuantity = it.countedQuantity || 0;
-          const difference = countedQuantity - currentStock;
           return {
             product: it.productId,
             currentStock,
             countedQuantity,
-            difference,
           };
         });
 
@@ -117,7 +137,6 @@ export const Adjustments: React.FC = () => {
       }
 
       const payload = {
-        reference: `ADJ-${Date.now().toString().slice(-6)}`,
         warehouse: warehouseId,
         location: formData.location,
         reason: formData.reason,
@@ -149,7 +168,6 @@ export const Adjustments: React.FC = () => {
       setFormData({
         items: [
           { productId: '', currentStock: 0, countedQuantity: 0 },
-          { productId: '', currentStock: 0, countedQuantity: 0 },
         ],
         reason: 'counting_error',
         reasonDescription: '',
@@ -164,48 +182,100 @@ export const Adjustments: React.FC = () => {
   };
 
   const CreateAdjustmentModal = () => (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Stock Adjustment</h3>
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Create Stock Adjustment</h3>
+        
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Products Section */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">Products</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Products to Adjust</label>
+              <button
+                type="button"
+                onClick={addProductRow}
+                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
+                + Add Product
+              </button>
+            </div>
             <div className="space-y-3">
               {formData.items.map((item, index) => (
-                <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <select
-                    value={item.productId}
-                    onChange={(e) => handleProductSelect(index, e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Select Product</option>
-                    {products.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} ({product.sku}) - Current: {product.currentStock}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    value={item.currentStock}
-                    readOnly
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50"
-                    placeholder="Current Stock"
-                  />
-                  <input
-                    type="number"
-                    value={item.countedQuantity}
-                    onChange={(e) => setFormData(prev => {
-                      const items = [...prev.items];
-                      items[index] = {
-                        ...items[index],
-                        countedQuantity: parseInt(e.target.value) || 0,
-                      };
-                      return { ...prev, items };
-                    })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="Counted Quantity"
-                  />
+                <div key={index} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Product</label>
+                      <select
+                        value={item.productId}
+                        onChange={(e) => handleProductSelect(index, e.target.value)}
+                        required
+                        className="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="">-- Select Product --</option>
+                        {products.map(product => (
+                          <option key={product.id} value={product.id}>
+                            {product.name} ({product.sku}) - Stock: {product.currentStock}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Current</label>
+                        <input
+                          type="number"
+                          value={item.currentStock}
+                          readOnly
+                          className="block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Counted</label>
+                        <input
+                          type="number"
+                          value={item.countedQuantity}
+                          onChange={(e) => setFormData(prev => {
+                            const items = [...prev.items];
+                            items[index] = {
+                              ...items[index],
+                              countedQuantity: parseInt(e.target.value) || 0,
+                            };
+                            return { ...prev, items };
+                          })}
+                          required
+                          min="0"
+                          className="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Difference</label>
+                        <input
+                          type="text"
+                          value={item.countedQuantity - item.currentStock}
+                          readOnly
+                          className={`block w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-bold ${
+                            item.countedQuantity - item.currentStock > 0 ? 'text-green-600' :
+                            item.countedQuantity - item.currentStock < 0 ? 'text-red-600' : 'text-gray-600'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                    {formData.items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeProductRow(index)}
+                        className="text-xs text-red-600 hover:text-red-700 text-left"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -237,41 +307,6 @@ export const Adjustments: React.FC = () => {
               placeholder="e.g., Aisle 3 - Shelf B"
             />
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Current Stock</label>
-              <input
-                type="number"
-                value={formData.currentStock}
-                readOnly
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Counted Quantity</label>
-              <input
-                type="number"
-                value={formData.countedQuantity}
-                onChange={(e) => setFormData({ ...formData, countedQuantity: parseInt(e.target.value) || 0 })}
-                required
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-          </div>
-
-          {formData.productId && (
-            <div className="bg-gray-50 p-3 rounded-md">
-              <span className="text-sm font-medium text-gray-700">Adjustment:</span>
-              <span className={`ml-2 font-bold ${
-                formData.countedQuantity - formData.currentStock > 0 ? 'text-green-600' : 
-                formData.countedQuantity - formData.currentStock < 0 ? 'text-red-600' : 'text-gray-600'
-              }`}>
-                {formData.countedQuantity - formData.currentStock > 0 ? '+' : ''}
-                {formData.countedQuantity - formData.currentStock}
-              </span>
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Reason</label>
@@ -327,13 +362,15 @@ export const Adjustments: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Inventory Adjustments</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Adjustment
-        </button>
+        {isManager && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Adjustment
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -345,48 +382,67 @@ export const Adjustments: React.FC = () => {
                   Reference
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Product
+                  Warehouse / Location
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Adjustment
+                  Items
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Reason
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Notes
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-6 text-center text-sm text-gray-600">Loading adjustments...</td>
+                  <td colSpan={6} className="px-6 py-6 text-center text-sm text-gray-600">Loading adjustments...</td>
                 </tr>
               ) : adjustments.length > 0 ? (
                 adjustments.map((adjustment) => (
                   <tr key={adjustment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                      {adjustment.reference}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-mono font-medium text-gray-900">{adjustment.reference}</div>
+                      {adjustment.notes && (
+                        <div className="text-xs text-gray-500 mt-1">{adjustment.notes}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">{adjustment.warehouse}</div>
+                      <div className="text-xs text-gray-500">{adjustment.location}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{adjustment.productName}</div>
-                        <div className="text-sm text-gray-500">{adjustment.productSku}</div>
+                      <div className="text-sm text-gray-900">{adjustment.itemsCount} product(s)</div>
+                      <div className="text-xs text-gray-500">
+                        Total: <span className={`font-bold ${
+                          adjustment.totalAdjustment > 0 ? 'text-green-600' : 
+                          adjustment.totalAdjustment < 0 ? 'text-red-600' : 'text-gray-600'
+                        }`}>
+                          {adjustment.totalAdjustment}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-bold ${
-                        adjustment.quantity > 0 ? 'text-green-600' : 'text-red-600'
+                      <span className="text-sm text-gray-700 capitalize">
+                        {adjustment.reason.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        adjustment.status === 'done' ? 'bg-green-100 text-green-800' :
+                        adjustment.status === 'canceled' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {adjustment.quantity > 0 ? '+' : ''}{adjustment.quantity}
+                        {adjustment.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(adjustment.date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {adjustment.notes}
                     </td>
                   </tr>
                 ))

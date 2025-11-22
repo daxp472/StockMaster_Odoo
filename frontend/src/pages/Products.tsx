@@ -16,8 +16,10 @@ import warehouseService from '../services/warehouseService';
 
 export const Products: React.FC = () => {
   const { products, searchTerm, selectedCategory, categories } = useTypedSelector((state) => state.products);
+  const { user } = useTypedSelector((state) => state.auth);
   const dispatch = useDispatch<AppDispatch>();
   const [showModal, setShowModal] = useState(false);
+  const isManager = user?.role === 'inventory_manager';
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [formData, setFormData] = useState({
@@ -133,13 +135,15 @@ export const Products: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Product Management</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Product
-        </button>
+        {isManager && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Product
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -234,20 +238,24 @@ export const Products: React.FC = () => {
                     {product.location}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="text-indigo-600 hover:text-indigo-900 p-1"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="text-red-600 hover:text-red-900 p-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {isManager ? (
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEdit(product)}
+                          className="text-indigo-600 hover:text-indigo-900 p-1"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="text-red-600 hover:text-red-900 p-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-xs">View Only</span>
+                    )}
                   </td>
                 </tr>
               ))}

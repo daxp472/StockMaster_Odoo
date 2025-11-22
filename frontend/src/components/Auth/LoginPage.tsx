@@ -26,12 +26,8 @@ export const LoginPage: React.FC = () => {
       // Connect to socket server
       socketService.connect(result.id);
       
-      // Navigate based on role
-      if (result.role === 'warehouse_staff') {
-        navigate('/warehouse-dashboard');
-      } else {
-        navigate('/dashboard');
-      }
+      // Navigate to dashboard (same for all roles now)
+      navigate('/app/dashboard');
     } catch (err: any) {
       setError(err || 'Login failed. Please check your credentials.');
     } finally {
@@ -43,6 +39,14 @@ export const LoginPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
       <div className="max-w-md w-full mx-4">
         <div className="bg-white rounded-lg shadow-xl p-8">
+          {/* Back to Home */}
+          <button
+            onClick={() => navigate('/')}
+            className="text-sm text-gray-600 hover:text-purple-600 mb-6 flex items-center"
+          >
+            ← Back to Home
+          </button>
+
           {/* Logo */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">

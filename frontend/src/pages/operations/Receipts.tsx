@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Eye, CreditCard as Edit, Check } from 'lucide-react';
+import { Plus, Eye, CreditCard as Edit, Check, Package } from 'lucide-react';
 import { useTypedSelector } from '../../hooks/useTypedSelector';
 import { useDispatch } from 'react-redux';
 import { addReceipt, updateReceipt, setReceipts } from '../../store/slices/operationSlice';
+import { fetchProducts } from '../../store/slices/productSlice';
+import { AppDispatch } from '../../store';
 import operationService from '../../services/operationService';
 import warehouseService from '../../services/warehouseService';
 
 export const Receipts: React.FC = () => {
   const { receipts } = useTypedSelector((state) => state.operations);
   const { products } = useTypedSelector((state) => state.products);
-  const dispatch = useDispatch();
+  const { user } = useTypedSelector((state) => state.auth);
+  const dispatch = useDispatch<AppDispatch>();
   const [showModal, setShowModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const isManager = user?.role === 'inventory_manager';
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -26,6 +30,36 @@ export const Receipts: React.FC = () => {
  
   const handleStatusChange = async (id: string, newStatus: 'draft' | 'waiting' | 'ready' | 'done' | 'canceled') => {
     try {
+      if (newStatus === 'canceled') {
+        await operationService.cancelReceipt(id);
+        const fetchReceipts = async () => {
+          const resp = await operationService.getReceipts();
+          const list = (resp && resp.data) ? resp.data : resp;
+          const mapped = (list || []).map((r: any) => {
+            const totalQuantity = (r.items || []).reduce((sum: number, it: any) => sum + (it.quantityOrdered || 0), 0);
+            return {
+              id: r._id || r.id,
+              reference: r.reference,
+              supplier: r.supplier,
+              status: r.status || 'draft',
+              date: r.expectedDate || r.createdAt || new Date().toISOString(),
+              totalQuantity,
+              items: (r.items || []).map((it: any) => ({
+                id: it._id || it.id || `${r._id || r.id}-${it.product?._id || it.product}`,
+                productId: it.product?._id || it.product,
+                productName: it.product?.name || (products.find(p => p.id === (it.product?._id || it.product))?.name || ''),
+                productSku: it.product?.sku || (products.find(p => p.id === (it.product?._id || it.product))?.sku || ''),
+                quantityOrdered: it.quantityOrdered || 0,
+                quantityReceived: it.quantityReceived || 0,
+                unitCost: it.unitCost || 0,
+              })),
+            };
+          });
+          dispatch(setReceipts(mapped));
+        };
+        fetchReceipts();
+        return;
+      }
       const updated = await operationService.updateReceipt(id, { status: newStatus } as any);
       const mapped = {
         id: updated.data?._id || updated._id,
@@ -48,11 +82,59 @@ export const Receipts: React.FC = () => {
       dispatch(updateReceipt(mapped as any));
     } catch (err) {
       console.error('Failed to update receipt status', err);
+      alert('Failed to update receipt status');
     }
   };
 
-  // Fetch receipts from backend and populate list
+  const handleProcessReceipt = async (receipt: any) => {
+    try {
+      // Process the receipt with all items at their ordered quantities
+      const items = receipt.items.map((item: any) => ({
+        productId: item.productId,
+        quantityReceived: item.quantityOrdered
+      }));
+      
+      await operationService.processReceipt(receipt.id, items);
+      
+      // Refresh the receipts list
+      const resp = await operationService.getReceipts();
+      const list = (resp && resp.data) ? resp.data : resp;
+      const mapped = (list || []).map((r: any) => {
+        const totalQuantity = (r.items || []).reduce((sum: number, it: any) => sum + (it.quantityOrdered || 0), 0);
+        return {
+          id: r._id || r.id,
+          reference: r.reference,
+          supplier: r.supplier,
+          status: r.status || 'draft',
+          date: r.expectedDate || r.createdAt || new Date().toISOString(),
+          totalQuantity,
+          items: (r.items || []).map((it: any) => ({
+            id: it._id || it.id || `${r._id || r.id}-${it.product?._id || it.product}`,
+            productId: it.product?._id || it.product,
+            productName: it.product?.name || (products.find(p => p.id === (it.product?._id || it.product))?.name || ''),
+            productSku: it.product?.sku || (products.find(p => p.id === (it.product?._id || it.product))?.sku || ''),
+            quantityOrdered: it.quantityOrdered || 0,
+            quantityReceived: it.quantityReceived || 0,
+            unitCost: it.unitCost || 0,
+          })),
+        };
+      });
+      dispatch(setReceipts(mapped));
+      
+      // Refresh products to show updated stock
+      dispatch(fetchProducts());
+      
+      alert('✅ Receipt processed successfully! Stock has been updated.');
+    } catch (err: any) {
+      console.error('Failed to process receipt', err);
+      alert('Failed to process receipt: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  // Fetch receipts and products from backend
   useEffect(() => {
+    dispatch(fetchProducts());
+    
     const fetchReceipts = async () => {
       try {
         const resp = await operationService.getReceipts();
@@ -85,12 +167,7 @@ export const Receipts: React.FC = () => {
       }
     };
     fetchReceipts();
-  }, [dispatch, products]);
-
-  const handleValidate = (receipt: any) => {
-    const updatedReceipt = { ...receipt, status: 'done' };
-    dispatch(updateReceipt(updatedReceipt));
-  };
+  }, [dispatch]); // FIXED: Removed 'products' dependency to prevent infinite loop
 
   const CreateReceiptModal = () => {
     const [formData, setFormData] = useState({
@@ -107,10 +184,17 @@ export const Receipts: React.FC = () => {
     useEffect(() => {
       const fetchWarehouses = async () => {
         try {
+          console.log('Fetching warehouses...');
           const response = await warehouseService.getWarehouses();
-          setWarehouses(response.data?.data || []);
+          console.log('Warehouse response:', response);
+          console.log('Warehouse data:', response.data);
+          const warehouseList = response.data?.data || [];
+          console.log('Extracted warehouses:', warehouseList);
+          setWarehouses(warehouseList);
         } catch (error: any) {
-          console.error('Failed to load warehouses', error);
+          console.error('Failed to load warehouses:', error);
+          console.error('Error response:', error.response);
+          alert('Failed to load warehouses. Please check console for details.');
         }
       };
       fetchWarehouses();
@@ -310,13 +394,15 @@ export const Receipts: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Receipts (Incoming Stock)</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Receipt
-        </button>
+        {isManager && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Receipt
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -387,13 +473,13 @@ export const Receipts: React.FC = () => {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      {receipt.status === 'waiting' && (
+                      {(receipt.status === 'ready' || receipt.status === 'waiting') && (
                         <button
-                          onClick={() => handleValidate(receipt)}
+                          onClick={() => handleProcessReceipt(receipt)}
                           className="text-green-600 hover:text-green-900 p-1"
-                          title="Validate Receipt"
+                          title="Process Receipt (Update Stock)"
                         >
-                          <Check className="w-4 h-4" />
+                          <Package className="w-4 h-4" />
                         </button>
                       )}
                     </div>

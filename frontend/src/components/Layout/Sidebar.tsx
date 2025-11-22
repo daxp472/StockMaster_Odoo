@@ -43,29 +43,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
   };
 
   const managerMenuItems = [
-    { path: '/dashboard', icon: BarChart3, label: 'Dashboard' },
-    { path: '/products', icon: Package, label: 'Products' },
+    { path: '/app/dashboard', icon: BarChart3, label: 'Dashboard' },
+    { path: '/app/products', icon: Package, label: 'Products' },
     { 
       label: 'Operations',
       isHeader: true,
       children: [
-        { path: '/operations/receipts', icon: ArrowDownToLine, label: 'Receipts' },
-        { path: '/operations/deliveries', icon: ArrowUpFromLine, label: 'Delivery Orders' },
-        { path: '/operations/adjustments', icon: RotateCcw, label: 'Inventory Adjustment' },
+        { path: '/app/operations/receipts', icon: ArrowDownToLine, label: 'Receipts' },
+        { path: '/app/operations/deliveries', icon: ArrowUpFromLine, label: 'Delivery Orders' },
+        { path: '/app/operations/adjustments', icon: RotateCcw, label: 'Inventory Adjustment' },
       ]
     },
-    { path: '/move-history', icon: History, label: 'Move History' },
-    { path: '/settings', icon: Settings, label: 'Settings' },
-    { path: '/staff-management', icon: Users, label: 'Staff Management' },
+    { path: '/app/move-history', icon: History, label: 'Move History' },
+    { path: '/app/settings', icon: Settings, label: 'Settings' },
+    { path: '/app/staff-management', icon: Users, label: 'Staff Management' },
   ];
 
   const staffMenuItems = [
-    { path: '/warehouse-dashboard', icon: BarChart3, label: 'My Dashboard' },
-    { path: '/my-tasks', icon: CheckSquare, label: 'My Tasks' },
-    { path: '/quick-receive', icon: ArrowDownToLine, label: 'Quick Receive' },
-    { path: '/quick-pick', icon: ArrowUpFromLine, label: 'Quick Pick' },
-    { path: '/stock-count', icon: Clipboard, label: 'Stock Count' },
-    { path: '/my-history', icon: History, label: 'My Activity' },
+    { path: '/app/dashboard', icon: BarChart3, label: 'Dashboard' },
+    { path: '/app/products', icon: Package, label: 'Products' },
+    { 
+      label: 'Operations',
+      isHeader: true,
+      children: [
+        { path: '/app/operations/receipts', icon: ArrowDownToLine, label: 'Receipts' },
+        { path: '/app/operations/deliveries', icon: ArrowUpFromLine, label: 'Delivery Orders' },
+        { path: '/app/operations/adjustments', icon: RotateCcw, label: 'Inventory Adjustment' },
+      ]
+    },
+    { path: '/app/move-history', icon: History, label: 'Move History' },
   ];
 
   const menuItems = user?.role === 'inventory_manager' ? managerMenuItems : staffMenuItems;
