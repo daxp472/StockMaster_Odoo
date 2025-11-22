@@ -30,13 +30,11 @@ const server = createServer(app);
 // Initialize Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: [
-      // process.env.FRONTEND_URL || "http://localhost:5173",
-      "https://odoo-x-spit.netlify.app"
-    ],
+    origin: "*", // allow all origins
     methods: ["GET", "POST", "PUT", "DELETE"]
   }
 });
+
 
 
 // Make io accessible to our routes
@@ -59,10 +57,7 @@ app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: [
-      // process.env.FRONTEND_URL || "http://localhost:5173",
-      "https://odoo-x-spit.netlify.app"
-    ],
+  origin: "*",
   credentials: true
 }));
 
