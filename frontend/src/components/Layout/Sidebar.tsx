@@ -19,6 +19,7 @@ import {
 import { useDispatch } from 'react-redux';
 import { useTypedSelector } from '../../hooks/useTypedSelector';
 import { logout } from '../../store/slices/authSlice';
+import socketService from '../../services/socketService';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -31,7 +32,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
   const { user } = useTypedSelector((state) => state.auth);
 
   const handleLogout = () => {
+    // Disconnect socket
+    socketService.disconnect();
+    
+    // Logout from Redux (also clears localStorage)
     dispatch(logout());
+    
+    // Navigate to login
     navigate('/login');
   };
 

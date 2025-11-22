@@ -1,38 +1,42 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Eye, EyeOff, Package } from 'lucide-react';
-import { loginSuccess } from '../../store/slices/authSlice';
+import { Eye, EyeOff, Package, AlertCircle } from 'lucide-react';
+import { loginUser } from '../../store/slices/authSlice';
+import { AppDispatch } from '../../store';
+import socketService from '../../services/socketService';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const dispatch = useDispatch();
+  const [error, setError] = useState<string | null>(null);
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      // Check if it's warehouse staff or manager
-      const isWarehouseStaff = email.includes('staff') || email === 'staff@company.com';
-      const role = isWarehouseStaff ? 'warehouse_staff' : 'inventory_manager';
+    try {
+      const result = await dispatch(loginUser({ email, password })).unwrap();
       
-      dispatch(loginSuccess({
-        id: isWarehouseStaff ? '2' : '1',
-        email,
-        name: isWarehouseStaff ? 'Rahul Kumar' : 'John Doe',
-        role,
-        isActive: true,
-        createdAt: '2025-01-01',
-      }));
+      // Connect to socket server
+      socketService.connect(result.id);
+      
+      // Navigate based on role
+      if (result.role === 'warehouse_staff') {
+        navigate('/warehouse-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err || 'Login failed. Please check your credentials.');
+    } finally {
       setIsLoading(false);
-      navigate(isWarehouseStaff ? '/warehouse-dashboard' : '/dashboard');
-    }, 1000);
+    }
   };
 
   return (
@@ -48,6 +52,14 @@ export const LoginPage: React.FC = () => {
             <p className="text-gray-600 mt-2">Sign in to your account</p>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
@@ -60,7 +72,8 @@ export const LoginPage: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                disabled={isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="Enter your email"
               />
             </div>
@@ -76,13 +89,15 @@ export const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-10"
+                  disabled={isLoading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-gray-400" />
@@ -132,8 +147,8 @@ export const LoginPage: React.FC = () => {
             </p>
             <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-md">
               <p className="font-medium mb-1">Demo Accounts:</p>
-              <p>Manager: manager@company.com / password</p>
-              <p>Staff: staff@company.com / password</p>
+              <p>Manager: manager@stockmaster.com / password123</p>
+              <p>Staff: staff1@stockmaster.com / password123</p>
             </div>
           </div>
         </div>

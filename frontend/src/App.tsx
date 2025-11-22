@@ -20,6 +20,11 @@ import { Deliveries } from './pages/operations/Deliveries';
 import { Adjustments } from './pages/operations/Adjustments';
 import { MoveHistory } from './pages/MoveHistory';
 import { Settings } from './pages/Settings';
+// Staff-specific pages
+import { QuickReceive } from './pages/QuickReceive';
+import { QuickPick } from './pages/QuickPick';
+import { StockCount } from './pages/StockCount';
+import { MyActivity } from './pages/MyActivity';
 
 function App() {
   return (
@@ -55,6 +60,11 @@ function App() {
               <Route path="operations/adjustments" element={<Adjustments />} />
               <Route path="move-history" element={<MoveHistory />} />
               <Route path="settings" element={<Settings />} />
+              {/* Staff-specific routes */}
+              <Route path="quick-receive" element={<QuickReceive />} />
+              <Route path="quick-pick" element={<QuickPick />} />
+              <Route path="stock-count" element={<StockCount />} />
+              <Route path="my-history" element={<MyActivity />} />
 
               {/* Fallback for unknown routes inside layout */}
               <Route path="*" element={<Navigate to="dashboard" replace />} />

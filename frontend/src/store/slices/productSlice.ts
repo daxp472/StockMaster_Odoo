@@ -1,5 +1,6 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Product } from '../../types';
+import * as productService from '../../services/productService';
 
 interface ProductState {
   products: Product[];
@@ -7,58 +8,88 @@ interface ProductState {
   error: string | null;
   searchTerm: string;
   selectedCategory: string;
+  categories: string[];
+  pagination: {
+    page: number;
+    pages: number;
+    total: number;
+  };
 }
 
 const initialState: ProductState = {
-  products: [
-    {
-      id: '1',
-      name: 'Steel Rods',
-      sku: 'STL-001',
-      category: 'Raw Materials',
-      unitOfMeasure: 'kg',
-      currentStock: 100,
-      minStock: 20,
-      maxStock: 500,
-      cost: 25.50,
-      location: 'Main Warehouse',
-      createdAt: '2025-01-01',
-      updatedAt: '2025-01-01',
-    },
-    {
-      id: '2',
-      name: 'Office Chairs',
-      sku: 'CHR-001',
-      category: 'Furniture',
-      unitOfMeasure: 'pcs',
-      currentStock: 15,
-      minStock: 10,
-      maxStock: 100,
-      cost: 150.00,
-      location: 'Main Warehouse',
-      createdAt: '2025-01-01',
-      updatedAt: '2025-01-01',
-    },
-    {
-      id: '3',
-      name: 'Laptop Stand',
-      sku: 'LPS-001',
-      category: 'Electronics',
-      unitOfMeasure: 'pcs',
-      currentStock: 5,
-      minStock: 10,
-      maxStock: 50,
-      cost: 45.00,
-      location: 'Main Warehouse',
-      createdAt: '2025-01-01',
-      updatedAt: '2025-01-01',
-    }
-  ],
+  products: [],
   isLoading: false,
   error: null,
   searchTerm: '',
   selectedCategory: 'all',
+  categories: [],
+  pagination: {
+    page: 1,
+    pages: 1,
+    total: 0,
+  },
 };
+
+// Async thunks
+export const fetchProducts = createAsyncThunk(
+  'products/fetchProducts',
+  async (filters?: any, { rejectWithValue }) => {
+    try {
+      const response = await productService.getProducts(filters);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch products');
+    }
+  }
+);
+
+export const fetchCategories = createAsyncThunk(
+  'products/fetchCategories',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await productService.getCategories();
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch categories');
+    }
+  }
+);
+
+export const createProduct = createAsyncThunk(
+  'products/createProduct',
+  async (productData: Partial<Product>, { rejectWithValue }) => {
+    try {
+      const response = await productService.createProduct(productData);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to create product');
+    }
+  }
+);
+
+export const updateProductAsync = createAsyncThunk(
+  'products/updateProduct',
+  async ({ id, data }: { id: string; data: Partial<Product> }, { rejectWithValue }) => {
+    try {
+      const response = await productService.updateProduct(id, data);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to update product');
+    }
+  }
+);
+
+export const deleteProductAsync = createAsyncThunk(
+  'products/deleteProduct',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      await productService.deleteProduct(id);
+      return id;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to delete product');
+    }
+  }
+);
 
 const productSlice = createSlice({
   name: 'products',
@@ -91,6 +122,49 @@ const productSlice = createSlice({
     setSelectedCategory: (state, action: PayloadAction<string>) => {
       state.selectedCategory = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    // Fetch products
+    builder.addCase(fetchProducts.pending, (state) => {
+      state.isLoading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchProducts.fulfilled, (state, action) => {
+      state.products = action.payload.data;
+      state.pagination = {
+        page: action.payload.page,
+        pages: action.payload.pages,
+        total: action.payload.total,
+      };
+      state.isLoading = false;
+    });
+    builder.addCase(fetchProducts.rejected, (state, action) => {
+      state.isLoading = false;
+      state.error = action.payload as string;
+    });
+
+    // Fetch categories
+    builder.addCase(fetchCategories.fulfilled, (state, action) => {
+      state.categories = action.payload;
+    });
+
+    // Create product
+    builder.addCase(createProduct.fulfilled, (state, action) => {
+      state.products.unshift(action.payload);
+    });
+
+    // Update product
+    builder.addCase(updateProductAsync.fulfilled, (state, action) => {
+      const index = state.products.findIndex(p => p.id === action.payload.id);
+      if (index !== -1) {
+        state.products[index] = action.payload;
+      }
+    });
+
+    // Delete product
+    builder.addCase(deleteProductAsync.fulfilled, (state, action) => {
+      state.products = state.products.filter(p => p.id !== action.payload);
+    });
   },
 });
 

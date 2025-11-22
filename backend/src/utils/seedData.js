@@ -25,21 +25,21 @@ const seedData = async () => {
 
     // Create Manager User
     console.log('👤 Creating users...');
-    const managerPassword = await bcrypt.hash('password123', 12);
+    // Don't hash here - let the User model's pre-save hook handle it
     const manager = await User.create({
       name: 'John Doe',
       email: 'manager@stockmaster.com',
-      password: managerPassword,
+      password: 'password123',
       role: 'inventory_manager',
       isActive: true
     });
 
     // Create Staff Users
-    const staffPassword = await bcrypt.hash('password123', 12);
+    // Don't hash here - let the User model's pre-save hook handle it
     const staff1 = await User.create({
       name: 'Rahul Kumar',
       email: 'staff1@stockmaster.com',
-      password: staffPassword,
+      password: 'password123',
       role: 'warehouse_staff',
       createdBy: manager._id,
       isActive: true
@@ -48,7 +48,7 @@ const seedData = async () => {
     const staff2 = await User.create({
       name: 'Priya Sharma',
       email: 'staff2@stockmaster.com',
-      password: staffPassword,
+      password: 'password123',
       role: 'warehouse_staff',
       createdBy: manager._id,
       isActive: true

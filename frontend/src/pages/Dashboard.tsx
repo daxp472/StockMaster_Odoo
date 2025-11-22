@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Package, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, RotateCcw, TrendingUp } from 'lucide-react';
 import { useTypedSelector } from '../hooks/useTypedSelector';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '../store';
 import { KPICard } from '../components/Dashboard/KPICard';
 import { FilterBar } from '../components/Dashboard/FilterBar';
+import { fetchDashboardStats } from '../store/slices/dashboardSlice';
+import { fetchProducts } from '../store/slices/productSlice';
 
 export const Dashboard: React.FC = () => {
   const { stats } = useTypedSelector((state) => state.dashboard);
   const { products } = useTypedSelector((state) => state.products);
   const { receipts, deliveries, movements } = useTypedSelector((state) => state.operations);
+  const dispatch = useDispatch<AppDispatch>();
+
+  useEffect(() => {
+    dispatch(fetchDashboardStats());
+    dispatch(fetchProducts());
+  }, [dispatch]);
 
   const lowStockProducts = products.filter(p => p.currentStock <= (p.minStock || 0));
   const recentMovements = movements.slice(0, 10);
