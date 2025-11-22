@@ -23,8 +23,8 @@ export const Receipts: React.FC = () => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-
- i  const handleStatusChange = async (id: string, newStatus: 'draft' | 'waiting' | 'ready' | 'done' | 'canceled') => {
+ 
+  const handleStatusChange = async (id: string, newStatus: 'draft' | 'waiting' | 'ready' | 'done' | 'canceled') => {
     try {
       const updated = await operationService.updateReceipt(id, { status: newStatus } as any);
       const mapped = {
