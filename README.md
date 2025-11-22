@@ -121,50 +121,72 @@
 <div align="center">
 
 ```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        A[React 18 + TypeScript]
-        B[Redux Toolkit]
-        C[Tailwind CSS]
-        D[Socket.IO Client]
-    end
-    
-    subgraph "Backend Layer"
-        E[Node.js + Express]
-        F[Socket.IO Server]
-        G[RESTful API]
-        H[JWT Authentication]
-    end
-    
-    subgraph "Data Layer"
-        I[MongoDB Atlas]
-        J[Mongoose ODM]
-        K[Real-time Subscriptions]
-    end
-    
-    subgraph "Security & Performance"
-        L[Rate Limiting]
-        M[Helmet Security]
-        N[Compression]
-        O[Error Handling]
-    end
-    
-    A --> E
-    B --> G
-    D --> F
-    E --> I
-    F --> K
-    G --> J
-    H --> E
-    L --> E
-    M --> E
-    N --> E
-    O --> E
+flowchart LR
+  %% Layout LR for a wide, presentation-friendly diagram
+
+  subgraph FRONTEND["Frontend Layer"]
+    direction TB
+    A[React 18 + TypeScript]
+    B[Redux Toolkit]
+    C[Tailwind CSS]
+    D[Socket.IO Client]
+  end
+
+  subgraph BACKEND["Backend Layer"]
+    direction TB
+    E[Node.js + Express]
+    F[Socket.IO Server]
+    G[RESTful API]
+    H[JWT Authentication]
+  end
+
+  subgraph DATA["Data Layer"]
+    direction TB
+    I[MongoDB Atlas]
+    J[Mongoose ODM]
+    K[Real-time Subscriptions]
+  end
+
+  subgraph SEC["Security & Performance"]
+    direction LR
+    L[Rate Limiting]
+    M[Helmet Security]
+    N[Compression]
+    O[Error Handling]
+  end
+
+  %% Primary flow (left -> right)
+  A -->|API calls| E
+  B -.->|state -> api| G
+  D -->|ws| F
+
+  %% Backend -> data
+  E -->|reads/writes| I
+  G --> J
+  F --> K
+
+  %% Cross-cutting concerns
+  H --> E
+  L --> E
+  M --> E
+  N --> E
+  O --> E
+
+  %% Styling (GitHub-friendly)
+  classDef frontend fill:#0ea5a4,stroke:#065f46,color:white,stroke-width:1px;
+  classDef backend fill:#2563eb,stroke:#1e40af,color:white,stroke-width:1px;
+  classDef data fill:#f59e0b,stroke:#92400e,color:black,stroke-width:1px;
+  classDef security fill:#ef4444,stroke:#7f1d1d,color:white,stroke-width:1px;
+
+  class A,B,C,D frontend;
+  class E,F,G,H backend;
+  class I,J,K data;
+  class L,M,N,O security;
 ```
 
-</div>
+<div>
 
----
+
 
 ## 📁 **Project Structure**
 
